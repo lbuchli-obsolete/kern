@@ -6,11 +6,11 @@ use std::ops::Deref;
 
 // the compiler produces the initial state of the reducer
 
-pub fn compile<'a>(ast: Program<Name>) -> Result<State<'a>, String> {
+pub fn compile(ast: Program<Name>) -> Result<State, String> {
     let globals = buildGlobals(ast)?;
     if let Some(main) = globals.get("main") {
         Ok(State {
-            stack: vec![HNode::SuperCombinator(main)],
+            stack: vec![Box::new(HNode::SuperCombinator(Box::new(main.clone())))],
             dump: vec![],
             globals: globals.clone(),
             stats: Stat::new(),
@@ -20,7 +20,7 @@ pub fn compile<'a>(ast: Program<Name>) -> Result<State<'a>, String> {
     }
 }
 
-fn buildGlobals<'a>(ast: Program<Name>) -> Result<HashMap<Name, (Vec<Name>, HNode<'a>)>, String> {
+fn buildGlobals(ast: Program<Name>) -> Result<HashMap<Name, (Vec<Name>, HNode)>, String> {
     let mut result = HashMap::new();
     for global in ast {
         result.insert(
@@ -32,10 +32,10 @@ fn buildGlobals<'a>(ast: Program<Name>) -> Result<HashMap<Name, (Vec<Name>, HNod
     Ok(result)
 }
 
-fn parseExpr<'a>(
+fn parseExpr(
     expr: Expr<Name>,
-    globals: HashMap<Name, (Vec<Name>, HNode<'a>)>,
-) -> Result<HNode<'a>, String> {
+    globals: HashMap<Name, (Vec<Name>, HNode)>,
+) -> Result<HNode, String> {
     match expr {
         Expr::Variable(name) => match name.deref() {
             "|" | "&" | "==" | "!=" | ">" | ">=" | "<" | "<=" | "+" | "-" | "*" | "/" => {
@@ -44,7 +44,7 @@ fn parseExpr<'a>(
             _ => {
                 let def = globals.get(&name);
                 if let Some(sc) = def {
-                    Ok(HNode::<'a>::SuperCombinator(sc))
+                    Ok(HNode::SuperCombinator(Box::new(sc.clone())))
                 } else {
                     Err(format!("Definition for {} not found", name))
                 }
@@ -53,8 +53,8 @@ fn parseExpr<'a>(
         Expr::Number(n) => Ok(HNode::Number(n)),
         Expr::Constructor { .. } => Err("Constructors are not yet supported :(".to_owned()),
         Expr::Application(a, b) => Ok(HNode::Application(
-            &parseExpr(*a, globals.clone())?,
-            &parseExpr(*b, globals.clone())?,
+            Box::new(parseExpr(*a, globals.clone())?),
+            Box::new(parseExpr(*b, globals.clone())?),
         )),
         Expr::Let { .. } => Err("Let expressions are not yet supported :(".to_owned()),
         Expr::Case { .. } => Err("Case expressions are not yet supported :(".to_owned()),

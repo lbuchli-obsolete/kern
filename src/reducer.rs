@@ -3,23 +3,23 @@ use std::collections::HashMap;
 use std::ops::Deref;
 
 #[derive(Clone, Debug)]
-pub enum HNode<'a> {
-    Application(&'a HNode<'a>, &'a HNode<'a>),
-    SuperCombinator(&'a (Vec<parser::Name>, HNode<'a>)),
+pub enum HNode {
+    Application(Box<HNode>, Box<HNode>),
+    SuperCombinator(Box<(Vec<parser::Name>, HNode)>),
     PrimitiveFn(parser::Name),
     Number(i64),
 }
 
-pub struct State<'a> {
-    pub stack: Vec<HNode<'a>>,     // the current graph
-    pub dump: Vec<Vec<HNode<'a>>>, // stack of old graphs
-    pub globals: HashMap<parser::Name, (Vec<parser::Name>, HNode<'a>)>, // a list of all supercombinators
-    pub stats: Stat,                                                    // performance statistics
+pub struct State {
+    pub stack: Vec<Box<HNode>>,     // the current graph
+    pub dump: Vec<Box<Vec<HNode>>>, // stack of old graphs
+    pub globals: HashMap<parser::Name, (Vec<parser::Name>, HNode)>, // a list of all supercombinators
+    pub stats: Stat,                                                // performance statistics
 }
 
-impl<'a> State<'a> {
+impl State {
     /// Create a blank state
-    pub fn new() -> State<'a> {
+    pub fn new() -> State {
         State {
             stack: vec![],
             dump: vec![],
@@ -29,7 +29,7 @@ impl<'a> State<'a> {
     }
 
     /// Unwind the node (given it's an Application) onto the current stack
-    fn unwind(&mut self, node: HNode<'a>) -> Result<(), &str> {
+    fn unwind(&mut self, node: HNode) -> Result<(), &str> {
         if let HNode::Application(a, _) = node {
             self.stack.push(a.clone());
             Ok(())
@@ -58,13 +58,13 @@ impl<'a> State<'a> {
             // check if arguments are evaluated; else evaluate them
             if let Some(first_app) = spine_stack.get(spine_stack.len() - 2) {
                 if let HNode::Application(_, right_a) = first_app {
-                    if let HNode::Number(a) = right_a {
+                    if let HNode::Number(a) = **right_a {
                         // yay! The first parameter is a number. Let's check the second one
                         if let Some(second_app) = spine_stack.get(spine_stack.len() - 3) {
                             if let HNode::Application(_, right_b) = second_app {
-                                if let HNode::Number(b) = right_b {
+                                if let HNode::Number(b) = **right_b {
                                     // yay! we can calculate now and then save the result
-                                    let result = calculate_primitve(name.clone(), *a, *b);
+                                    let result = calculate_primitve(name.clone(), a, b);
                                     // TODO save result
                                     Ok(())
                                 } else {
@@ -111,7 +111,7 @@ impl Stat {
 }
 
 /// reduces expressions (and thus evaluates them)
-pub fn reduce<'a>(root: HNode<'a>) -> HNode<'a> {
+pub fn reduce(root: HNode) -> HNode {
     let mut state = State::new();
     HNode::Number(42) // answer
 }
