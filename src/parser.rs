@@ -40,9 +40,9 @@ impl<T> Expr<T> {
 
 #[derive(Debug)]
 pub struct SuperCombinator<T> {
-    name: Name,
-    args: Vec<T>,
-    value: Expr<T>,
+    pub name: Name,
+    pub args: Vec<T>,
+    pub value: Expr<T>,
 }
 
 pub type Program<T> = Vec<SuperCombinator<T>>;
@@ -73,7 +73,7 @@ peg::parser! {
                 --
                 x:@ _? "&" _? y:(@) { binaryop_expr("&", x, y) }
                 --
-                x:(@) _? "==" _? y:@  { binaryop_expr("==", x, y) } // TODO infix
+                x:(@) _? "==" _? y:@  { binaryop_expr("==", x, y) } // TODO infix?
                 x:(@) _? "!=" _? y:@  { binaryop_expr("!=", x, y) } // infix
                 x:(@) _? ">"  _? y:@  { binaryop_expr(">", x, y) }  // infix
                 x:(@) _? ">=" _? y:@  { binaryop_expr(">=", x, y) } // infix

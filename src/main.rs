@@ -1,8 +1,9 @@
+mod compiler;
 pub mod parser;
 mod prelude;
+mod reducer;
 
 fn main() {
-    println!("{:?}", prelude::PRELUDE);
     println!(
         "{:?}",
         parser::kern::program(
