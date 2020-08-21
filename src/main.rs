@@ -6,11 +6,17 @@ mod reducer;
 fn main() {
     println!(
         "{:?}",
-        parser::kern::program(
-            "
-main = double 32;
-double x = x+x
+        reducer::reduce(
+            &mut compiler::compile(
+                parser::kern::program(
+                    "
+double x = x+x;
+main = double 32
 "
+                )
+                .unwrap()
+            )
+            .unwrap()
         )
     );
 }

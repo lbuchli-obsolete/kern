@@ -4,13 +4,12 @@ use crate::reducer::*;
 use std::collections::HashMap;
 use std::ops::Deref;
 
-// the compiler produces the initial state of the reducer
-
-pub fn compile(ast: Program<Name>) -> Result<State, String> {
-    let globals = buildGlobals(ast)?;
-    if let Some(main) = globals.get("main") {
+// produces the initial state of the reducer
+pub fn compile<'a>(ast: Program<Name>) -> Result<State<'a>, String> {
+    let globals = build_globals(ast)?;
+    if globals.get("main").is_some() {
         Ok(State {
-            stack: vec![Box::new(HNode::SuperCombinator(Box::new(main.clone())))],
+            stack: vec![NodeBox::new(HNode::SuperCombinator("main"))],
             dump: vec![],
             globals: globals.clone(),
             stats: Stat::new(),
@@ -20,42 +19,44 @@ pub fn compile(ast: Program<Name>) -> Result<State, String> {
     }
 }
 
-fn buildGlobals(ast: Program<Name>) -> Result<HashMap<Name, (Vec<Name>, HNode)>, String> {
-    let mut result = HashMap::new();
+fn build_globals<'a>(
+    ast: Program<Name>,
+) -> Result<HashMap<Name, (Vec<Name>, NodeBox<'a>)>, String> {
+    let mut result: HashMap<Name, (Vec<Name>, NodeBox)> = HashMap::new();
     for global in ast {
+        let mut locals = HashMap::new();
+        for arg in global.args.clone() {
+            locals.insert(arg, NodeBox::new(HNode::Number(42))); // TODO what to put here? I'm afraid 42 isn't the answer...
+        }
         result.insert(
             global.name,
-            (global.args, parseExpr(global.value, result.clone())?),
+            (global.args, parse_expr(global.value, locals)?),
         );
     }
 
     Ok(result)
 }
 
-fn parseExpr(
-    expr: Expr<Name>,
-    globals: HashMap<Name, (Vec<Name>, HNode)>,
-) -> Result<HNode, String> {
+fn parse_expr(expr: Expr<Name>, locals: HashMap<Name, NodeBox>) -> Result<NodeBox, String> {
     match expr {
         Expr::Variable(name) => match name.deref() {
             "|" | "&" | "==" | "!=" | ">" | ">=" | "<" | "<=" | "+" | "-" | "*" | "/" => {
-                Ok(HNode::PrimitiveFn(name))
+                Ok(NodeBox::new(HNode::PrimitiveFn(&name)))
             }
             _ => {
-                let def = globals.get(&name);
-                if let Some(sc) = def {
-                    Ok(HNode::SuperCombinator(Box::new(sc.clone())))
+                if let Some(var) = locals.get(&name) {
+                    Ok(var.clone()) // TODO don't clone the var, point to it
                 } else {
-                    Err(format!("Definition for {} not found", name))
+                    Ok(NodeBox::new(HNode::SuperCombinator(&name)))
                 }
             }
         },
-        Expr::Number(n) => Ok(HNode::Number(n)),
+        Expr::Number(n) => Ok(NodeBox::new(HNode::Number(n))),
         Expr::Constructor { .. } => Err("Constructors are not yet supported :(".to_owned()),
-        Expr::Application(a, b) => Ok(HNode::Application(
-            Box::new(parseExpr(*a, globals.clone())?),
-            Box::new(parseExpr(*b, globals.clone())?),
-        )),
+        Expr::Application(a, b) => Ok(NodeBox::new(HNode::Application(
+            parse_expr(*a, locals.clone())?,
+            parse_expr(*b, locals.clone())?,
+        ))),
         Expr::Let { .. } => Err("Let expressions are not yet supported :(".to_owned()),
         Expr::Case { .. } => Err("Case expressions are not yet supported :(".to_owned()),
         Expr::Lambda { .. } => Err("Lambda expressions are not yet supported :(".to_owned()),
